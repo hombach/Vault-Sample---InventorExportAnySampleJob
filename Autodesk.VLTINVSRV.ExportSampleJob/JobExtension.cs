@@ -341,17 +341,32 @@ namespace Autodesk.VltInvSrv.ExportSampleJob
                 }
 
                 //define download settings for the project file
-                VDF.Vault.Settings.AcquireFilesSettings mDownloadSettings = new VDF.Vault.Settings.AcquireFilesSettings(connection);
-                mDownloadSettings.LocalPath = new VDF.Currency.FolderPathAbsolute(mWfPath);
+                VDF.Vault.Settings.AcquireFilesSettings mDownloadSettings_IPJ = new VDF.Vault.Settings.AcquireFilesSettings(connection);
+                mDownloadSettings_IPJ.LocalPath = new VDF.Currency.FolderPathAbsolute(mWfPath);
                 mIpjFileIter = new VDF.Vault.Currency.Entities.FileIteration(connection, mProjFile);
-                mDownloadSettings.AddFileToAcquire(mIpjFileIter, VDF.Vault.Settings.AcquireFilesSettings.AcquisitionOption.Download);
+                mDownloadSettings_IPJ.AddFileToAcquire(mIpjFileIter, VDF.Vault.Settings.AcquireFilesSettings.AcquisitionOption.Download);
 
                 //download project file and get local path
                 VDF.Vault.Results.AcquireFilesResults mDownLoadResult;
                 VDF.Vault.Results.FileAcquisitionResult fileAcquisitionResult;
-                mDownLoadResult = connection.FileManager.AcquireFiles(mDownloadSettings);
-                fileAcquisitionResult = mDownLoadResult.FileResults.FirstOrDefault();
-                mIpjLocalPath = fileAcquisitionResult.LocalPath.FullPath;
+                mDownLoadResult = connection.FileManager.AcquireFiles(mDownloadSettings_IPJ);
+                fileAcquisitionResult = mDownLoadResult?.FileResults.FirstOrDefault();
+                if (fileAcquisitionResult != null)
+                {
+                    mIpjLocalPath = fileAcquisitionResult.LocalPath.FullPath;
+                }
+                else
+                {
+                    //let's check for allowance that an existing to be consumed
+                    if (settings.AcceptLocalIpj.ToLower() == "true" && System.IO.File.Exists(mDownloadSettings_IPJ.LocalPath.ToString()))
+                    {                     
+                        mIpjLocalPath = mDownloadSettings_IPJ.LocalPath.ToString() + mIpjFileName;
+                    }
+                    else
+                    {
+                        throw new Exception("Job stopped execution as the project file to translate did not download");
+                    }
+                }
 
                 //activate the given project file for this job only
                 projectManager = mInv.DesignProjectManager;
@@ -381,31 +396,10 @@ namespace Autodesk.VltInvSrv.ExportSampleJob
             #region download source file(s)
             mTrace.IndentLevel += 1;
             mTrace.WriteLine("Job downloads source file(s) for translation.");
-            //download the source file iteration, enforcing overwrite if local files exist
-            VDF.Vault.Settings.AcquireFilesSettings mDownloadSettings2 = new VDF.Vault.Settings.AcquireFilesSettings(connection);
-            VDF.Vault.Currency.Entities.FileIteration mFileIteration = new VDF.Vault.Currency.Entities.FileIteration(connection, mFile);
-            mDownloadSettings2.AddFileToAcquire(mFileIteration, VDF.Vault.Settings.AcquireFilesSettings.AcquisitionOption.Download);
-            mDownloadSettings2.OrganizeFilesRelativeToCommonVaultRoot = true;
-            mDownloadSettings2.OptionsRelationshipGathering.FileRelationshipSettings.IncludeChildren = true;
-            mDownloadSettings2.OptionsRelationshipGathering.FileRelationshipSettings.RecurseChildren = true;
-            mDownloadSettings2.OptionsRelationshipGathering.FileRelationshipSettings.IncludeLibraryContents = true;
-            mDownloadSettings2.OptionsRelationshipGathering.FileRelationshipSettings.ReleaseBiased = true;
-            VDF.Vault.Settings.AcquireFilesSettings.AcquireFileResolutionOptions mResOpt = new VDF.Vault.Settings.AcquireFilesSettings.AcquireFileResolutionOptions();
-            mResOpt.OverwriteOption = VDF.Vault.Settings.AcquireFilesSettings.AcquireFileResolutionOptions.OverwriteOptions.ForceOverwriteAll;
-            mResOpt.SyncWithRemoteSiteSetting = VDF.Vault.Settings.AcquireFilesSettings.SyncWithRemoteSite.Always;
 
-            //execute download
-            VDF.Vault.Results.AcquireFilesResults mDownLoadResult2 = connection.FileManager.AcquireFiles(mDownloadSettings2);
-            //pickup result details
-            VDF.Vault.Results.FileAcquisitionResult fileAcquisitionResult2 = mDownLoadResult2.FileResults.Where(n => n.File.EntityName == mFileIteration.EntityName).FirstOrDefault();
+            string mDocPath = mDownloadFile(connection, mFile);
+            string mExt = System.IO.Path.GetExtension(mDocPath);
 
-            if (fileAcquisitionResult2 == null)
-            {
-                mResetIpj(mSaveProject);
-                throw new Exception("Job stopped execution as the source file to translate did not download");
-            }
-            string mDocPath = fileAcquisitionResult2.LocalPath.FullPath;
-            string mExt = System.IO.Path.GetExtension(mDocPath); //mDocPath.Split('.').Last();
             mTrace.WriteLine("Job successfully downloaded source file(s) for translation.");
             #endregion download source file(s)
 
@@ -767,10 +761,10 @@ namespace Autodesk.VltInvSrv.ExportSampleJob
                 if ((item == "NWD" || item == "NWD+DWF") && mNavisworksAutomation != null)
                 {
                     //delete existing export files; note the resulting file name is e.g. "Assembly.iam.nwd
-                    string mNWDName = mDocPath + ".nwd";
-                    if (System.IO.File.Exists(mNWDName))
+                    string mNwdName = mDocPath + ".nwd";
+                    if (System.IO.File.Exists(mNwdName))
                     {
-                        System.IO.FileInfo fileInfo = new FileInfo(mNWDName);
+                        System.IO.FileInfo fileInfo = new FileInfo(mNwdName);
                         fileInfo.IsReadOnly = false;
                         fileInfo.Delete();
                     }
@@ -792,11 +786,36 @@ namespace Autodesk.VltInvSrv.ExportSampleJob
                     {
                         //disable navisworks progress bar whilst we do this procedure
                         //Navisworks.DisableProgress();
-                        //open the file with navisworks; opening other file formats creates a new navisworks file appending the import file
-                        mNavisworksAutomation.OpenFile(mDocPath);
+
+                        // check if a NWD template is enabled.
+                        if (string.IsNullOrEmpty(mSettings.NwdTemplate))
+                        {
+                            //open the file with navisworks; opening other file formats creates a new navisworks file appending the import file
+                            mNavisworksAutomation.OpenFile(mDocPath);
+                        }
+                        else
+                        {
+                            // download the template file
+                            ACW.File mNwdTemplateFile = mWsMgr.DocumentService.FindLatestFilesByPaths(new string[] { mSettings.NwdTemplate }).FirstOrDefault();
+                            if (mNwdTemplateFile != null)
+                            {
+                                string mNwdTemplate = mDownloadFile(connection, mNwdTemplateFile);
+
+                                //open the template file with Navisworks
+                                mNavisworksAutomation.OpenFile(mNwdTemplate);
+
+                                //append the source file to the template file
+                                mNavisworksAutomation.AppendFile(mDocPath);
+                            }
+                            else
+                            {
+                                throw new Exception("Job stopped execution as the file " + settings.NwdTemplate + " was not found in the vault.");
+                            }
+
+                        }
 
                         //save the new navisworks
-                        mNavisworksAutomation.SaveFile(mNWDName);
+                        mNavisworksAutomation.SaveFile(mNwdName);
 
                         //export DWF
                         if (item == "NWD+DWF")
@@ -806,17 +825,17 @@ namespace Autodesk.VltInvSrv.ExportSampleJob
                         //Navisworks.EnableProgress();
 
                         //collect all export files for later upload
-                        System.IO.FileInfo mExportFileInfo = new System.IO.FileInfo(mNWDName);
+                        System.IO.FileInfo mExportFileInfo = new System.IO.FileInfo(mNwdName);
                         if (mExportFileInfo.Exists)
                         {
-                            mUploadFiles.Add(mNWDName);
+                            mUploadFiles.Add(mNwdName);
                             mTrace.WriteLine("Navisworks created file: " + mUploadFiles.LastOrDefault());
                             mTrace.IndentLevel -= 1;
                         }
                         else
                         {
                             mResetIpj(mSaveProject);
-                            throw new Exception("Validating the export file " + mNWDName + " before upload failed.");
+                            throw new Exception("Validating the export file " + mNwdName + " before upload failed.");
                         }
                         if (item == "NWD+DWF")
                         {
@@ -1104,7 +1123,7 @@ namespace Autodesk.VltInvSrv.ExportSampleJob
                             mExplUtil.UpdateFileProperties(mExpFile, mPropDictonary);
                             mExpFile = (mWsMgr.DocumentService.GetLatestFileByMasterId(mExpFile.MasterId));
                         }
-                    }                   
+                    }
 
                     catch (Exception ex)
                     {
@@ -1227,6 +1246,34 @@ namespace Autodesk.VltInvSrv.ExportSampleJob
                 sldWorks.ExitApp();
                 sldWorks = null;
             }
+        }
+
+        private string mDownloadFile(Connection connection, ACW.File mFile)
+        {
+            //download the source file iteration, enforcing overwrite if local files exist
+            VDF.Vault.Settings.AcquireFilesSettings mDownloadSettings = new VDF.Vault.Settings.AcquireFilesSettings(connection);
+            VDF.Vault.Currency.Entities.FileIteration mFileIteration = new VDF.Vault.Currency.Entities.FileIteration(connection, mFile);
+            mDownloadSettings.AddFileToAcquire(mFileIteration, VDF.Vault.Settings.AcquireFilesSettings.AcquisitionOption.Download);
+            mDownloadSettings.OrganizeFilesRelativeToCommonVaultRoot = true;
+            mDownloadSettings.OptionsRelationshipGathering.FileRelationshipSettings.IncludeChildren = true;
+            mDownloadSettings.OptionsRelationshipGathering.FileRelationshipSettings.RecurseChildren = true;
+            mDownloadSettings.OptionsRelationshipGathering.FileRelationshipSettings.IncludeLibraryContents = true;
+            mDownloadSettings.OptionsRelationshipGathering.FileRelationshipSettings.ReleaseBiased = true;
+            VDF.Vault.Settings.AcquireFilesSettings.AcquireFileResolutionOptions mResOpt = new VDF.Vault.Settings.AcquireFilesSettings.AcquireFileResolutionOptions();
+            mResOpt.OverwriteOption = VDF.Vault.Settings.AcquireFilesSettings.AcquireFileResolutionOptions.OverwriteOptions.ForceOverwriteAll;
+            mResOpt.SyncWithRemoteSiteSetting = VDF.Vault.Settings.AcquireFilesSettings.SyncWithRemoteSite.Always;
+
+            //execute download
+            VDF.Vault.Results.AcquireFilesResults mDownLoadResult = connection.FileManager.AcquireFiles(mDownloadSettings);
+            //pickup result details
+            VDF.Vault.Results.FileAcquisitionResult fileAcquisitionResult = mDownLoadResult.FileResults.Where(n => n.File.EntityName == mFileIteration.EntityName).FirstOrDefault();
+
+            if (fileAcquisitionResult == null)
+            {
+                throw new Exception("Job stopped execution as the file " + mFile.Name + " did not download.");
+            }
+            string mDocPath = fileAcquisitionResult.LocalPath.FullPath;
+            return mDocPath;
         }
 
         #endregion Job Execution

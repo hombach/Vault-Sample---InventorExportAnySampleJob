@@ -40,6 +40,12 @@ namespace Autodesk.VltInvSrv.ExportSampleJob
         [XmlElement("ImgFileType")]
         public string ImgFileType;
 
+        [XmlElement("NwdTemplate")]
+        public string NwdTemplate;
+
+        [XmlElement("AcceptLocalIpj")]
+        public string AcceptLocalIpj;
+
         private Settings()
         {
 

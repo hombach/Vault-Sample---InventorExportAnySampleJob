@@ -48,6 +48,7 @@ The job expects that all library definition files configured in the Inventor pro
 
 VERSION HISTORY / RELEASE NOTES:
 ---------------------------------
+2025.2.0.1 - added template support for Navisworks NWD creation. Added option to allow the reuse of local IPJ file.
 2025.1.0.0 - enhanced Navisworks export and added Navisworks DWF visualization export, added Solidworks PDF export option (design representation attachment)
 2025.0.0.0 - updated for 2025 compatibility
 2024.0.0.0 - updated for 2024 compatibility
