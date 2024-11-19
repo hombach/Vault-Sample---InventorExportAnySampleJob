@@ -40,6 +40,9 @@ namespace Autodesk.VltInvSrv.ExportSampleJob
         [XmlElement("ImgFileType")]
         public string ImgFileType;
 
+        [XmlElement("NwdTemplate")]
+        public string NwdTemplate;
+
         private Settings()
         {
 
