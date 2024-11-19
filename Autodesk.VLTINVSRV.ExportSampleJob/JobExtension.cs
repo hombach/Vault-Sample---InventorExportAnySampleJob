@@ -341,17 +341,32 @@ namespace Autodesk.VltInvSrv.ExportSampleJob
                 }
 
                 //define download settings for the project file
-                VDF.Vault.Settings.AcquireFilesSettings mDownloadSettings = new VDF.Vault.Settings.AcquireFilesSettings(connection);
-                mDownloadSettings.LocalPath = new VDF.Currency.FolderPathAbsolute(mWfPath);
+                VDF.Vault.Settings.AcquireFilesSettings mDownloadSettings_IPJ = new VDF.Vault.Settings.AcquireFilesSettings(connection);
+                mDownloadSettings_IPJ.LocalPath = new VDF.Currency.FolderPathAbsolute(mWfPath);
                 mIpjFileIter = new VDF.Vault.Currency.Entities.FileIteration(connection, mProjFile);
-                mDownloadSettings.AddFileToAcquire(mIpjFileIter, VDF.Vault.Settings.AcquireFilesSettings.AcquisitionOption.Download);
+                mDownloadSettings_IPJ.AddFileToAcquire(mIpjFileIter, VDF.Vault.Settings.AcquireFilesSettings.AcquisitionOption.Download);
 
                 //download project file and get local path
                 VDF.Vault.Results.AcquireFilesResults mDownLoadResult;
                 VDF.Vault.Results.FileAcquisitionResult fileAcquisitionResult;
-                mDownLoadResult = connection.FileManager.AcquireFiles(mDownloadSettings);
-                fileAcquisitionResult = mDownLoadResult.FileResults.FirstOrDefault();
-                mIpjLocalPath = fileAcquisitionResult.LocalPath.FullPath;
+                mDownLoadResult = connection.FileManager.AcquireFiles(mDownloadSettings_IPJ);
+                fileAcquisitionResult = mDownLoadResult?.FileResults.FirstOrDefault();
+                if (fileAcquisitionResult != null)
+                {
+                    mIpjLocalPath = fileAcquisitionResult.LocalPath.FullPath;
+                }
+                else
+                {
+                    //let's check for allowance that an existing to be consumed
+                    if (settings.AcceptLocalIpj.ToLower() == "true" && System.IO.File.Exists(mDownloadSettings_IPJ.LocalPath.ToString()))
+                    {                     
+                        mIpjLocalPath = mDownloadSettings_IPJ.LocalPath.ToString() + mIpjFileName;
+                    }
+                    else
+                    {
+                        throw new Exception("Job stopped execution as the project file to translate did not download");
+                    }
+                }
 
                 //activate the given project file for this job only
                 projectManager = mInv.DesignProjectManager;
@@ -381,31 +396,10 @@ namespace Autodesk.VltInvSrv.ExportSampleJob
             #region download source file(s)
             mTrace.IndentLevel += 1;
             mTrace.WriteLine("Job downloads source file(s) for translation.");
-            //download the source file iteration, enforcing overwrite if local files exist
-            VDF.Vault.Settings.AcquireFilesSettings mDownloadSettings2 = new VDF.Vault.Settings.AcquireFilesSettings(connection);
-            VDF.Vault.Currency.Entities.FileIteration mFileIteration = new VDF.Vault.Currency.Entities.FileIteration(connection, mFile);
-            mDownloadSettings2.AddFileToAcquire(mFileIteration, VDF.Vault.Settings.AcquireFilesSettings.AcquisitionOption.Download);
-            mDownloadSettings2.OrganizeFilesRelativeToCommonVaultRoot = true;
-            mDownloadSettings2.OptionsRelationshipGathering.FileRelationshipSettings.IncludeChildren = true;
-            mDownloadSettings2.OptionsRelationshipGathering.FileRelationshipSettings.RecurseChildren = true;
-            mDownloadSettings2.OptionsRelationshipGathering.FileRelationshipSettings.IncludeLibraryContents = true;
-            mDownloadSettings2.OptionsRelationshipGathering.FileRelationshipSettings.ReleaseBiased = true;
-            VDF.Vault.Settings.AcquireFilesSettings.AcquireFileResolutionOptions mResOpt = new VDF.Vault.Settings.AcquireFilesSettings.AcquireFileResolutionOptions();
-            mResOpt.OverwriteOption = VDF.Vault.Settings.AcquireFilesSettings.AcquireFileResolutionOptions.OverwriteOptions.ForceOverwriteAll;
-            mResOpt.SyncWithRemoteSiteSetting = VDF.Vault.Settings.AcquireFilesSettings.SyncWithRemoteSite.Always;
 
-            //execute download
-            VDF.Vault.Results.AcquireFilesResults mDownLoadResult2 = connection.FileManager.AcquireFiles(mDownloadSettings2);
-            //pickup result details
-            VDF.Vault.Results.FileAcquisitionResult fileAcquisitionResult2 = mDownLoadResult2.FileResults.Where(n => n.File.EntityName == mFileIteration.EntityName).FirstOrDefault();
+            string mDocPath = mDownloadFile(connection, mFile);
+            string mExt = System.IO.Path.GetExtension(mDocPath);
 
-            if (fileAcquisitionResult2 == null)
-            {
-                mResetIpj(mSaveProject);
-                throw new Exception("Job stopped execution as the source file to translate did not download");
-            }
-            string mDocPath = fileAcquisitionResult2.LocalPath.FullPath;
-            string mExt = System.IO.Path.GetExtension(mDocPath); //mDocPath.Split('.').Last();
             mTrace.WriteLine("Job successfully downloaded source file(s) for translation.");
             #endregion download source file(s)
 

@@ -43,6 +43,9 @@ namespace Autodesk.VltInvSrv.ExportSampleJob
         [XmlElement("NwdTemplate")]
         public string NwdTemplate;
 
+        [XmlElement("AcceptLocalIpj")]
+        public string AcceptLocalIpj;
+
         private Settings()
         {
 

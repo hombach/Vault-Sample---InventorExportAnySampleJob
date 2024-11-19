@@ -3,12 +3,15 @@
 
   <!-- Logfile directory; validate for write access -->
   <LogFileLocation>C:\Temp\</LogFileLocation>
+  
+  <!-- Allow the reuse of an existing IPJ file if the download of it fails; accepted values are True/False-->
+  <AcceptLocalIpj>True</AcceptLocalIpj>
 
   <!-- Export File Format(s)-->
   <!--  Supported Values/File Formats are: STP, JT, SMDXF, 3DDWG, 2DDWG, IMAGE, NWD, NWD+DWF, SLDDRW.PDF -->
   <!--  Multiple Outputs per jobs are supported, list all required formats comma separated, e.g., STP, JT, SMDXF -->
   <!--  To Export Sheet Metal Flatpattern SMDXF - NOTE: distinct category for sheet metal part required, if job handles parts and SM-parts-->
-  <ExportFormats>NWD+DWF,SLDDRW.PDF</ExportFormats>
+  <ExportFormats>NWD+DWF</ExportFormats>
   
   <!-- NWD Template Options: store a Vault path of a NWD file as template, e.g. $/Templates/Navisworks/Standard-Vertical-Z.nwd-->
   <!-- Note - Using a template will add another reference to the resulting file.-->
