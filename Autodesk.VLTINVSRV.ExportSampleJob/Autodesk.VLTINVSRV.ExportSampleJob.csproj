@@ -17,7 +17,7 @@
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath>..\..\..\..\..\..\ProgramData\Autodesk\Vault 2020\Extensions\Autodesk.VltInvSrv.ExportSampleJob\</OutputPath>
+    <OutputPath>..\..\..\..\..\..\ProgramData\Autodesk\Vault 2025\Extensions\Autodesk.VltInvSrv.ExportSampleJob\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
