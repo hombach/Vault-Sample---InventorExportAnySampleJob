@@ -1,3 +1,5 @@
+# Latest News - 2026 branch will move to a new solution structure and repository. Link to be shared as it is released.
+
 # Vault-Inventor-Server EXPORT / Navisworks Import / Solidworks PDF Export -- JOB SAMPLE
 
 This custom job creates Inventor export format files using VaultInventorServer or Navisworks NWD files from any format Navisworks supports.
